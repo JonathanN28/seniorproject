@@ -14,12 +14,15 @@ var freeCam = false;
 
 const world = new CANNON.World();
 world.gravity.y = -9.8;
-const slipperyGround = world.addContactMaterial(groundMaterial, slipperyGround, {
+const slipperyMaterial = new CANNON.Material("slippery");
+var groundMaterial = new CANNON.Material('ground');
+const slipperyGround = new CANNON.ContactMaterial(groundMaterial, slipperyMaterial, {
     friction: 0.0001,
     restitution: 0.3,
     contactEquationStiffness: 1e8,
     contactEquationRelaxtion: 3
 })
+world.addContactMaterial(slipperyGround)
 
 const scene = new THREE.Scene();
 
@@ -44,7 +47,7 @@ const cube = new THREE.Mesh(geometry, material);
 scene.add(cube);
 
 const cubeShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-const cubeBody = new CANNON.Body({mass: 1});
+const cubeBody = new CANNON.Body({mass: 1, material: slipperyGround});
 cubeBody.addShape(cubeShape);
 world.addBody(cubeBody);
 
@@ -54,7 +57,7 @@ const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 scene.add(floor);
 floor.position.y = -0.5;
 floor.position.z = -45;
-var groundMaterial = new CANNON.Material('ground');
+
 const floorShape = new CANNON.Box(new CANNON.Vec3(5, 0.01, 50));
 const floorBody = new CANNON.Body({mass: 0, material: groundMaterial});
 floorBody.addShape(floorShape);
@@ -62,7 +65,6 @@ floorBody.position.x = 0;
 floorBody.position.y = -0.5;
 floorBody.position.z = -45;
 world.addBody(floorBody);
-
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.update;
@@ -75,7 +77,6 @@ gui.add(options, "freeCamera").onChange(function(bool)
     freeCam = bool;
     controls.enabled = bool;
 });
-
 
 
 
@@ -98,22 +99,25 @@ function animate()
     requestAnimationFrame(animate);
     world.step(1/60);
     cannonDebugger.update();
+    cube.position.copy(cubeBody.position);
+    cube.quaternion.copy(cubeBody.quaternion);
+
     if (keyCodes["KeyW"] && !keyCodes["KeyS"])
     {
-        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, -100));
+        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, -5));
     }
     else if (keyCodes["KeyS"] && !keyCodes["KeyW"])
     {
-        cubeBody.applyTorque(new CANNON.Vec3(0, 50, 0));
+        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, 5));
     }
 
     if (keyCodes["KeyA"] && !keyCodes["KeyD"])
     {
-        cube.applyTorque(new CANNON.Vec3(0, -50, 0));
+        cubeBody.applyTorque(new CANNON.Vec3(0, 1, 0));
     }
     else if (keyCodes["KeyD"] && !keyCodes["KeyA"])
     {
-        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, 100));
+        cubeBody.applyTorque(new CANNON.Vec3(0, -1, 0));
     }
 
     // Camera
