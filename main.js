@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import * as CANNON from 'cannon-es'
-
+import CannonDebugger, * as CANNONDebugger from 'cannon-es-debugger'
 
 // I guess I understand multiple/modifier keys.
 var keyCodes = {};
@@ -12,7 +12,24 @@ var options =
 };
 var freeCam = false;
 
+const world = new CANNON.World();
+world.gravity.y = -9.8;
+const slipperyGround = world.addContactMaterial(groundMaterial, slipperyGround, {
+    friction: 0.0001,
+    restitution: 0.3,
+    contactEquationStiffness: 1e8,
+    contactEquationRelaxtion: 3
+})
+
 const scene = new THREE.Scene();
+
+const cannonDebugger = new CannonDebugger(scene, world, {
+    onInit(body, mesh) {
+        mesh.visible = true;
+    }
+})
+
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer();
@@ -26,12 +43,25 @@ const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
 const cube = new THREE.Mesh(geometry, material);
 scene.add(cube);
 
+const cubeShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+const cubeBody = new CANNON.Body({mass: 1});
+cubeBody.addShape(cubeShape);
+world.addBody(cubeBody);
+
 const floorGeometry = new THREE.BoxGeometry(10, 0, 100);
 const floorMaterial = new THREE.MeshBasicMaterial({color: "white"});
 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 scene.add(floor);
 floor.position.y = -0.5;
-floor.position.z = -50;
+floor.position.z = -45;
+var groundMaterial = new CANNON.Material('ground');
+const floorShape = new CANNON.Box(new CANNON.Vec3(5, 0.01, 50));
+const floorBody = new CANNON.Body({mass: 0, material: groundMaterial});
+floorBody.addShape(floorShape);
+floorBody.position.x = 0;
+floorBody.position.y = -0.5;
+floorBody.position.z = -45;
+world.addBody(floorBody);
 
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -46,7 +76,8 @@ gui.add(options, "freeCamera").onChange(function(bool)
     controls.enabled = bool;
 });
 
-const world = new CANNON.World();
+
+
 
 function ListenKeys()
 {
@@ -65,22 +96,24 @@ ListenKeys();
 function animate()
 {
     requestAnimationFrame(animate);
+    world.step(1/60);
+    cannonDebugger.update();
     if (keyCodes["KeyW"] && !keyCodes["KeyS"])
     {
-        cube.translateZ(-0.01);
+        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, -100));
     }
     else if (keyCodes["KeyS"] && !keyCodes["KeyW"])
     {
-        cube.translateZ(0.01);
+        cubeBody.applyTorque(new CANNON.Vec3(0, 50, 0));
     }
 
     if (keyCodes["KeyA"] && !keyCodes["KeyD"])
     {
-        cube.rotateY(0.01);
+        cube.applyTorque(new CANNON.Vec3(0, -50, 0));
     }
     else if (keyCodes["KeyD"] && !keyCodes["KeyA"])
     {
-        cube.rotateY(-0.01);
+        cubeBody.applyLocalForce(new CANNON.Vec3(0, 0, 100));
     }
 
     // Camera
@@ -92,7 +125,7 @@ function animate()
     {
         camera.position.x = cube.position.x;
         camera.position.y = cube.position.y + 2;
-        camera.position.z = cube.position.z + 5;
+        camera.position.z = cube.position.z + 6;
         camera.rotation.x = 0;
         camera.rotation.y = 0;
         camera.rotation.z = 0;
